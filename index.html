@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1a18" media="(prefers-color-scheme: dark)">
+<title>Notizblock</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --text: #1a1a18;
+    --text-secondary: #6b6b67;
+    --text-hint: #9c9c97;
+    --accent: #1a1a18;
+    --accent-fg: #ffffff;
+    --danger: #a32d2d;
+    --border: rgba(0,0,0,0.12);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 8px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #242422;
+      --text: #f0ede6;
+      --text-secondary: #a8a49b;
+      --text-hint: #6f6b62;
+      --accent: #f0ede6;
+      --accent-fg: #1a1a18;
+      --danger: #e0817f;
+      --border: rgba(255,255,255,0.14);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 15px;
+    line-height: 1.6;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-text-size-adjust: 100%;
+  }
+  main {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 2rem 2rem calc(2rem + env(safe-area-inset-bottom));
+  }
+  header { margin-bottom: 1.5rem; }
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 400;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  h1 b { font-weight: 700; }
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-top: 0.15rem;
+  }
+  .composer {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0.9rem;
+    margin-bottom: 1.25rem;
+  }
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    resize: vertical;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 1.05rem;
+    line-height: 1.5;
+    padding: 0.7rem 0.8rem;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--text); }
+  textarea::placeholder { color: var(--text-hint); }
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.7rem;
+  }
+  .hint { color: var(--text-hint); font-size: 0.78rem; }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    border: 0.5px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    transition: background 0.15s, opacity 0.15s;
+  }
+  button:active { opacity: 0.7; }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 0.7rem 1.4rem;
+  }
+  .btn-primary:disabled { opacity: 0.4; cursor: default; }
+  .status {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-hint); flex: none;
+  }
+  .dot.ok { background: #4a8f5b; }
+  .dot.wait { background: #c99a3a; }
+  .dot.local { background: var(--text-hint); }
+  ul.notes { list-style: none; margin: 0; padding: 0; }
+  li.note {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0.8rem 0.9rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+  }
+  li.note.done { opacity: 0.55; }
+  .check {
+    flex: none;
+    width: 24px; height: 24px;
+    margin-top: 0.1rem;
+    border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--accent-fg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; line-height: 1;
+    padding: 0;
+  }
+  li.note.done .check {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .note-body { flex: 1; min-width: 0; }
+  .note-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+    font-size: 1.02rem;
+  }
+  li.note.done .note-text { text-decoration: line-through; }
+  .note-time {
+    color: var(--text-hint);
+    font-size: 0.72rem;
+    margin-top: 0.25rem;
+  }
+  .del {
+    flex: none;
+    width: 30px; height: 30px;
+    color: var(--text-hint);
+    font-size: 1.05rem; line-height: 1;
+    border-color: transparent;
+    padding: 0;
+  }
+  .del:hover { color: var(--danger); }
+  .del.confirm {
+    color: var(--danger);
+    border-color: var(--danger);
+    width: auto; padding: 0 0.6rem;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .empty {
+    color: var(--text-hint);
+    text-align: center;
+    padding: 2rem 1rem;
+    font-style: italic;
+  }
+  @media (max-width: 600px) {
+    main { padding: 1.25rem 1rem calc(1.25rem + env(safe-area-inset-bottom)); }
+    h1 { font-size: 1.45rem; }
+    .btn-primary { padding: 0.75rem 1.2rem; flex: 1; }
+    .composer-bar { flex-direction: column-reverse; align-items: stretch; }
+    .hint { text-align: center; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><b>Notiz</b>block</h1>
+    <div class="subtitle">Schnell festhalten, damit es nicht verloren geht.</div>
+  </header>
+
+  <div class="composer">
+    <textarea id="input" placeholder="Notiz eintippen oder mit der Mikrofon-Taste diktieren …" autofocus></textarea>
+    <div class="composer-bar">
+      <span class="hint">Strg/Cmd + Enter sichert auch</span>
+      <button class="btn-primary" id="save">Sichern</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"><span class="dot local"></span><span id="status-text">…</span></div>
+
+  <ul class="notes" id="list"></ul>
+</main>
+
+<script>
+/* ============================================================
+   EINSTELLUNGEN  –  hier nach dem Cloudflare-Setup eintragen
+   ============================================================ */
+const CONFIG = {
+  WORKER_URL: "https://notizblock.post-712.workers.dev",
+  TOKEN: "cb7ab943b5886b1cdca81f338b380234716a0544c0fcd901"
+};
+/* ============================================================ */
+
+const LS_NOTES   = "notizblock_notes";
+const LS_PENDING = "notizblock_pending";
+
+let notes   = load(LS_NOTES, []);
+let pending = load(LS_PENDING, []);
+let flushing = false;
+
+const $input  = document.getElementById("input");
+const $save   = document.getElementById("save");
+const $list   = document.getElementById("list");
+const $dot    = document.querySelector("#status .dot");
+const $status = document.getElementById("status-text");
+
+const configured = () => CONFIG.WORKER_URL.trim().length > 0;
+
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+  catch (e) { return fallback; }
+}
+function save(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+}
+function persist() { save(LS_NOTES, notes); save(LS_PENDING, pending); }
+
+function genId() {
+  if (crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function fmtTime(ts) {
+  try {
+    return new Intl.DateTimeFormat("de-DE", {
+      weekday: "short", day: "2-digit", month: "2-digit",
+      hour: "2-digit", minute: "2-digit"
+    }).format(new Date(ts));
+  } catch (e) { return ""; }
+}
+
+/* ---------- Rendering ---------- */
+function render() {
+  const sorted = notes.slice().sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;   // offene zuerst
+    return b.ts - a.ts;                              // neueste zuerst
+  });
+
+  $list.innerHTML = "";
+  if (sorted.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "Noch keine Notizen. Leg einfach los.";
+    $list.appendChild(li);
+  }
+
+  for (const n of sorted) {
+    const li = document.createElement("li");
+    li.className = "note" + (n.done ? " done" : "");
+
+    const check = document.createElement("button");
+    check.className = "check";
+    check.innerHTML = n.done ? "&#10003;" : "";
+    check.title = n.done ? "Als offen markieren" : "Als erledigt markieren";
+    check.onclick = () => toggle(n.id);
+
+    const body = document.createElement("div");
+    body.className = "note-body";
+    const text = document.createElement("div");
+    text.className = "note-text";
+    text.textContent = n.text;
+    const time = document.createElement("div");
+    time.className = "note-time";
+    time.textContent = fmtTime(n.ts);
+    body.appendChild(text);
+    body.appendChild(time);
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.innerHTML = "&times;";
+    del.title = "Löschen";
+    let armed = false, armTimer = null;
+    del.onclick = () => {
+      if (!armed) {
+        armed = true;
+        del.classList.add("confirm");
+        del.textContent = "Löschen?";
+        armTimer = setTimeout(() => {
+          armed = false; del.classList.remove("confirm"); del.innerHTML = "&times;";
+        }, 3000);
+      } else {
+        clearTimeout(armTimer);
+        remove(n.id);
+      }
+    };
+
+    li.appendChild(check);
+    li.appendChild(body);
+    li.appendChild(del);
+    $list.appendChild(li);
+  }
+  renderStatus();
+}
+
+function renderStatus() {
+  let cls = "local", txt;
+  if (!configured()) {
+    cls = "local";
+    txt = "Nur lokal auf diesem Gerät – Sync noch nicht eingerichtet";
+  } else if (!navigator.onLine) {
+    cls = "wait";
+    txt = pending.length ? pending.length + " Notiz(en) offline – werden nachgereicht" : "Offline";
+  } else if (pending.length) {
+    cls = "wait";
+    txt = "Synchronisiere …";
+  } else {
+    cls = "ok";
+    txt = "Synchron auf allen Geräten";
+  }
+  $dot.className = "dot " + cls;
+  $status.textContent = txt;
+}
+
+/* ---------- Aktionen ---------- */
+function addNote(raw) {
+  const text = raw.trim();
+  if (!text) return;
+  const note = { id: genId(), text, ts: Date.now(), done: false };
+  notes.unshift(note);
+  pending.push({ op: "add", note });
+  persist();
+  render();
+  flush();
+}
+
+function toggle(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  n.done = !n.done;
+  pending.push({ op: "toggle", id, done: n.done });
+  persist();
+  render();
+  flush();
+}
+
+function remove(id) {
+  notes = notes.filter(x => x.id !== id);
+  pending.push({ op: "delete", id });
+  persist();
+  render();
+  flush();
+}
+
+/* ---------- Server-Sync ---------- */
+async function api(payload) {
+  const res = await fetch(CONFIG.WORKER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + CONFIG.TOKEN
+    },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+async function flush() {
+  if (!configured() || flushing || !navigator.onLine) { renderStatus(); return; }
+  flushing = true;
+  renderStatus();
+  try {
+    while (pending.length) {
+      const op = pending[0];
+      if (op.op === "add") {
+        await api({ action: "add", id: op.note.id, text: op.note.text, ts: op.note.ts });
+      } else if (op.op === "toggle") {
+        await api({ action: "toggle", id: op.id, done: op.done });
+      } else if (op.op === "delete") {
+        await api({ action: "delete", id: op.id });
+      }
+      pending.shift();
+      persist();
+    }
+    await pull();
+  } catch (e) {
+    // offline / Fehler: bleibt in der Queue, späterer Versuch
+  } finally {
+    flushing = false;
+    renderStatus();
+  }
+}
+
+async function pull() {
+  if (!configured() || pending.length) return;
+  try {
+    const data = await api({ action: "list" });
+    if (data && Array.isArray(data.notes)) {
+      notes = data.notes;
+      persist();
+      render();
+    }
+  } catch (e) { /* still offline */ }
+}
+
+/* ---------- Ereignisse ---------- */
+$save.onclick = () => {
+  addNote($input.value);
+  $input.value = "";
+  $input.focus();
+};
+$input.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    $save.click();
+  }
+});
+window.addEventListener("online", flush);
+window.addEventListener("offline", renderStatus);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { pending.length ? flush() : pull(); }
+});
+setInterval(() => { pending.length ? flush() : pull(); }, 15000);
+
+/* ---------- Start ---------- */
+render();
+if (configured()) flush();
+</script>
+</body>
+</html>
