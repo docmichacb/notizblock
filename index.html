@@ -172,22 +172,61 @@
     font-size: 0.72rem;
     margin-top: 0.25rem;
   }
-  .del {
+  .note-actions {
     flex: none;
-    width: 30px; height: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1rem;
+    margin-left: 0.1rem;
+  }
+  .iconbtn {
+    width: 32px; height: 26px;
     color: var(--text-hint);
-    font-size: 1.05rem; line-height: 1;
+    font-size: 0.8rem; line-height: 1;
     border-color: transparent;
     padding: 0;
+    display: flex; align-items: center; justify-content: center;
   }
+  .iconbtn:hover { color: var(--text); }
+  .iconbtn:disabled { opacity: 0.25; cursor: default; }
+  .del { font-size: 1.05rem; }
   .del:hover { color: var(--danger); }
   .del.confirm {
     color: var(--danger);
     border-color: var(--danger);
-    width: auto; padding: 0 0.6rem;
+    width: auto; padding: 0 0.5rem;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .note-text { cursor: text; }
+  .edit-input {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    border: 0.5px solid var(--text);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 1.02rem;
+    line-height: 1.45;
+    padding: 0.5rem 0.6rem;
+    outline: none;
+  }
+  .edit-actions { display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+  .btn-small {
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    font-weight: 700;
+    padding: 0.4rem 0.75rem;
+  }
+  .btn-small.primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border-color: var(--accent);
   }
   .empty {
     color: var(--text-hint);
@@ -240,6 +279,7 @@ const LS_PENDING = "notizblock_pending";
 let notes   = load(LS_NOTES, []);
 let pending = load(LS_PENDING, []);
 let flushing = false;
+let editingId = null;
 
 const $input  = document.getElementById("input");
 const $save   = document.getElementById("save");
@@ -274,20 +314,23 @@ function fmtTime(ts) {
 
 /* ---------- Rendering ---------- */
 function render() {
-  const sorted = notes.slice().sort((a, b) => {
-    if (a.done !== b.done) return a.done ? 1 : -1;   // offene zuerst
-    return b.ts - a.ts;                              // neueste zuerst
-  });
-
   $list.innerHTML = "";
-  if (sorted.length === 0) {
+  if (notes.length === 0) {
     const li = document.createElement("li");
     li.className = "empty";
     li.textContent = "Noch keine Notizen. Leg einfach los.";
     $list.appendChild(li);
+    renderStatus();
+    return;
   }
 
-  for (const n of sorted) {
+  const opens = notes.filter(x => !x.done);
+  const dones = notes.filter(x => x.done);
+  const displayed = opens.concat(dones);   // Offene oben, Erledigtes sinkt nach unten
+
+  displayed.forEach((n) => {
+    const group = n.done ? dones : opens;
+    const gi = group.indexOf(n);
     const li = document.createElement("li");
     li.className = "note" + (n.done ? " done" : "");
 
@@ -299,17 +342,62 @@ function render() {
 
     const body = document.createElement("div");
     body.className = "note-body";
-    const text = document.createElement("div");
-    text.className = "note-text";
-    text.textContent = n.text;
-    const time = document.createElement("div");
-    time.className = "note-time";
-    time.textContent = fmtTime(n.ts);
-    body.appendChild(text);
-    body.appendChild(time);
+
+    if (editingId === n.id) {
+      // Bearbeiten-Modus
+      const ta = document.createElement("textarea");
+      ta.className = "edit-input";
+      ta.value = n.text;
+      const acts = document.createElement("div");
+      acts.className = "edit-actions";
+      const ok = document.createElement("button");
+      ok.className = "btn-small primary";
+      ok.textContent = "Speichern";
+      ok.onclick = () => saveEdit(n.id, ta.value);
+      const cancel = document.createElement("button");
+      cancel.className = "btn-small";
+      cancel.textContent = "Abbrechen";
+      cancel.onclick = () => { editingId = null; render(); };
+      ta.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); saveEdit(n.id, ta.value); }
+        if (e.key === "Escape") { editingId = null; render(); }
+      });
+      acts.appendChild(ok); acts.appendChild(cancel);
+      body.appendChild(ta);
+      body.appendChild(acts);
+      setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 0);
+    } else {
+      const text = document.createElement("div");
+      text.className = "note-text";
+      text.textContent = n.text;
+      text.title = "Zum Bearbeiten tippen";
+      text.onclick = () => { editingId = n.id; render(); };
+      const time = document.createElement("div");
+      time.className = "note-time";
+      time.textContent = fmtTime(n.ts);
+      body.appendChild(text);
+      body.appendChild(time);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "note-actions";
+
+    const up = document.createElement("button");
+    up.className = "iconbtn";
+    up.innerHTML = "&#9650;";
+    up.title = "Nach oben";
+    up.disabled = gi === 0;
+    up.onclick = () => move(n.id, -1);
+
+    const down = document.createElement("button");
+    down.className = "iconbtn";
+    down.innerHTML = "&#9660;";
+    down.title = "Nach unten";
+    down.disabled = gi === group.length - 1;
+    down.onclick = () => move(n.id, 1);
 
     const del = document.createElement("button");
-    del.className = "del";
+    del.className = "iconbtn del";
     del.innerHTML = "&times;";
     del.title = "Löschen";
     let armed = false, armTimer = null;
@@ -327,11 +415,15 @@ function render() {
       }
     };
 
+    actions.appendChild(up);
+    actions.appendChild(down);
+    actions.appendChild(del);
+
     li.appendChild(check);
     li.appendChild(body);
-    li.appendChild(del);
+    li.appendChild(actions);
     $list.appendChild(li);
-  }
+  });
   renderStatus();
 }
 
@@ -378,7 +470,41 @@ function toggle(id) {
 
 function remove(id) {
   notes = notes.filter(x => x.id !== id);
+  if (editingId === id) editingId = null;
   pending.push({ op: "delete", id });
+  persist();
+  render();
+  flush();
+}
+
+function saveEdit(id, text) {
+  const n = notes.find(x => x.id === id);
+  editingId = null;
+  if (n) {
+    const t = text.trim();
+    if (t.length && t !== n.text) {
+      n.text = t;
+      pending.push({ op: "edit", id, text: t });
+      persist();
+    }
+  }
+  render();
+  flush();
+}
+
+function move(id, dir) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  // Nur innerhalb der gleichen Gruppe (offen bzw. erledigt) verschieben
+  const group = notes.filter(x => !!x.done === !!n.done);
+  const gi = group.findIndex(x => x.id === id);
+  const gj = gi + dir;
+  if (gj < 0 || gj >= group.length) return;
+  const neighborId = group[gj].id;
+  const i = notes.findIndex(x => x.id === id);
+  const j = notes.findIndex(x => x.id === neighborId);
+  const tmp = notes[i]; notes[i] = notes[j]; notes[j] = tmp;
+  pending.push({ op: "reorder", ids: notes.map(x => x.id) });
   persist();
   render();
   flush();
@@ -409,6 +535,10 @@ async function flush() {
         await api({ action: "add", id: op.note.id, text: op.note.text, ts: op.note.ts });
       } else if (op.op === "toggle") {
         await api({ action: "toggle", id: op.id, done: op.done });
+      } else if (op.op === "edit") {
+        await api({ action: "edit", id: op.id, text: op.text });
+      } else if (op.op === "reorder") {
+        await api({ action: "reorder", ids: op.ids });
       } else if (op.op === "delete") {
         await api({ action: "delete", id: op.id });
       }
@@ -425,7 +555,7 @@ async function flush() {
 }
 
 async function pull() {
-  if (!configured() || pending.length) return;
+  if (!configured() || pending.length || editingId) return;
   try {
     const data = await api({ action: "list" });
     if (data && Array.isArray(data.notes)) {
